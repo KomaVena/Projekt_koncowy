@@ -1,88 +1,123 @@
 import sys
-import os
-import xmltodict
 import json
 import yaml
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QMessageBox
+import xml.etree.ElementTree as ET
+from threading import Thread
 
-class DataConverter(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.init_ui()
-
-    def init_ui(self):
-        self.setWindowTitle("Data Converter")
-        self.layout = QVBoxLayout()
-        self.source_file_label = QLabel("Source File:")
-        self.source_file_edit = QLineEdit()
-        self.browse_button = QPushButton("Browse")
-        self.target_file_label = QLabel("Target File:")
-        self.target_file_edit = QLineEdit()
-        self.convert_button = QPushButton("Convert")
-
-        self.browse_button.clicked.connect(self.browse_source_file)
-        self.convert_button.clicked.connect(self.convert_data)
-
-        file_layout = QHBoxLayout()
-        file_layout.addWidget(self.source_file_label)
-        file_layout.addWidget(self.source_file_edit)
-        file_layout.addWidget(self.browse_button)
-
-        self.layout.addLayout(file_layout)
-        self.layout.addWidget(self.target_file_label)
-        self.layout.addWidget(self.target_file_edit)
-        self.layout.addWidget(self.convert_button)
-
-        self.setLayout(self.layout)
-
-    def browse_source_file(self):
-        file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.ExistingFile)
-        file_path, _ = file_dialog.getOpenFileName(self, "Select Source File")
-        self.source_file_edit.setText(file_path)
-
-    def convert_data(self):
-        source_file_path = self.source_file_edit.text()
-        target_file_path = self.target_file_edit.text()
-
-        if not os.path.exists(source_file_path):
-            QMessageBox.warning(self, "Error", "Source file does not exist.")
-            return
-
-        file_extension = os.path.splitext(source_file_path)[1][1:]
-        if file_extension not in ["xml", "json", "yml", "yaml"]:
-            QMessageBox.warning(self, "Error", "Unsupported file format.")
-            return
-
+def load_json_async(input_file):
+    def load_json(input_file):
         try:
-            with open(source_file_path, "r") as source_file:
-                data = source_file.read()
+            with open(input_file, "r") as file:
+                data = json.load(file)
+            return data
+        except json.JSONDecodeError as e:
+            print("Błąd w składni pliku JSON:", str(e))
+            sys.exit(1)
+        except FileNotFoundError:
+            print("Plik", input_file, "nie istnieje.")
+            sys.exit(1)
 
-            if file_extension == "xml":
-                converted_data = xmltodict.parse(data)
-            elif file_extension == "json":
-                converted_data = json.loads(data)
-            else:
-                converted_data = yaml.safe_load(data)
+    data = None
+    thread = Thread(target=lambda: load_json(input_file))
+    thread.start()
+    thread.join()
+    return data
 
-            target_extension = os.path.splitext(target_file_path)[1][1:]
-            if target_extension == "xml":
-                converted_data = xmltodict.unparse(converted_data, pretty=True)
-            elif target_extension == "json":
-                converted_data = json.dumps(converted_data, indent=4)
-            else:
-                converted_data = yaml.dump(converted_data, default_flow_style=False)
+def save_json_async(output_file, data):
+    def save_json(output_file, data):
+        try:
+            with open(output_file, "w") as file:
+                json.dump(data, file, indent=4)
+        except:
+            print("Błąd podczas zapisu pliku JSON.")
+            sys.exit(1)
 
-            with open(target_file_path, "w") as target_file:
-                target_file.write(converted_data)
+    thread = Thread(target=lambda: save_json(output_file, data))
+    thread.start()
 
-            QMessageBox.information(self, "Success", "Conversion successful.")
+def load_yaml_async(input_file):
+    def load_yaml(input_file):
+        try:
+            with open(input_file, "r") as file:
+                data = yaml.safe_load(file)
+            return data
+        except yaml.YAMLError as e:
+            print("Błąd w składni pliku YAML:", str(e))
+            sys.exit(1)
+        except FileNotFoundError:
+            print("Plik", input_file, "nie istnieje.")
+            sys.exit(1)
 
-        except Exception as e:
-            QMessageBox.warning(self, "Error", str(e))
+    data = None
+    thread = Thread(target=lambda: load_yaml(input_file))
+    thread.start()
+    thread.join()
+    return data
+
+def save_yaml_async(output_file, data):
+    def save_yaml(output_file, data):
+        try:
+            with open(output_file, "w") as file:
+                yaml.dump(data, file, default_flow_style=False)
+        except:
+            print("Błąd podczas zapisu pliku YAML.")
+            sys.exit(1)
+
+    thread = Thread(target=lambda: save_yaml(output_file, data))
+    thread.start()
+
+def load_xml_async(input_file):
+    def load_xml(input_file):
+        try:
+            tree = ET.parse(input_file)
+            root = tree.getroot()
+            return root
+        except ET.ParseError as e:
+            print("Błąd w składni pliku XML:", str(e))
+            sys.exit(1)
+        except FileNotFoundError:
+            print("Plik", input_file, "nie istnieje.")
+            sys.exit(1)
+
+    root = None
+    thread = Thread(target=lambda: load_xml(input_file))
+    thread.start()
+    thread.join()
+    return root
+
+def save_xml_async(output_file, root):
+    def save_xml(output_file, root):
+        try:
+            tree = ET.ElementTree(root)
+            tree.write(output_file, encoding="utf-8", xml_declaration=True)
+        except:
+            print("Błąd podczas zapisu pliku XML.")
+            sys.exit(1)
+
+    thread = Thread(target=lambda: save_xml(output_file, root))
+    thread.start()
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    converter = DataConverter()
-    converter.show()
-    sys.exit(app.exec_())
+    input_file, output_file, input_format, output_format = parse_arguments()
+
+    if input_format == "json":
+        data = load_json_async(input_file)
+    elif input_format == "yaml":
+        data = load_yaml_async(input_file)
+    elif input_format == "xml":
+        root = load_xml_async(input_file)
+    else:
+        print("Nieobsługiwany format pliku wejściowego.")
+        sys.exit(1)
+
+    if output_format == "json":
+        save_json_async(output_file, data)
+    elif output_format == "yaml":
+        save_yaml_async(output_file, data)
+    elif output_format == "xml":
+        save_xml_async(output_file, root)
+    else:
+        print("Nieobsługiwany format pliku wyjściowego.")
+        sys.exit(1)
+
+        
