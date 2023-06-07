@@ -1,5 +1,0 @@
-pyinstaller
-json
-pyyaml
-xmltodict
-install PyQt5
