@@ -1,0 +1,39 @@
+name: Build and Upload
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"  # Run every Sunday at midnight
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  DEFAULT_SHELL: powershell
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.x
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Build executable
+      run: python -m pyinstaller --onefile main.py
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: executable
+        path: dist/main.exe
