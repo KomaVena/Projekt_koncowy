@@ -2,7 +2,7 @@ name: Build and Upload
 
 on:
   schedule:
-    - cron: "0 0 * * 0"  # Run every Sunday at midnight
+    - cron: "0 0 * * 0"  
   push:
     branches:
       - master
